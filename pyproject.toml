@@ -1,0 +1,33 @@
+[project]
+name = "intuistral"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mistralai-private>=1.3.8rc50",
+    "textual[syntax]>=3.0.1",
+    "textual-dev>=1.7.0",
+    "ruff>=0.11.4",
+]
+
+[[tool.uv.index]]
+name = "gemfury"
+url = "https://pypi.fury.io/mistralai/"
+explicit = true
+
+[tool.uv.sources]
+mistralai_private = { index = "gemfury" }
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "Q", "I", "T201"]
+ignore = ["E203"]
+fixable = ["ALL"]
+unfixable = []
+exclude = ["alembic"]
+
+[tool.ruff]
+line-length = 120
+exclude = ["alembic"]
+
+
