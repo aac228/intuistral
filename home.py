@@ -53,18 +53,8 @@ class Logo(Static):
 
 class Img(Static):
 
-    CSS = """
-    #gen-image {
-        height: 50%;
-        width: 100%;
-        position: relative;
-        align: center middle;
-        text-align: center;
-    }
-    """
-
     def __init__(self, image: Image, *args, **kwargs):
-        super().__init__(*args, **kwargs, id="gen-image")
+        super().__init__(*args, **kwargs)
         self.image = image
 
     def render(self) -> RenderResult:
@@ -128,6 +118,13 @@ class LeChatScreen(Screen):
         align: center middle;
         text-align: center;
         align: center middle;
+    }
+    
+    #gen-image {
+        margin-left: 80;
+        position: relative;
+        align: center middle;
+        text-align: center;
     }
     """
     def __init__(self, *args, conversation_id: str | None = None, **kwargs) -> None:
@@ -193,7 +190,7 @@ class LeChatScreen(Screen):
                     message.anchor()
                 self.app.call_from_thread(message.update, content)
             if chunk["image"]:
-                img = Img(image=chunk["image"])
+                img = Img(image=chunk["image"], id="gen-image")
                 self.app.call_from_thread(messages.mount, img)
                 messages = None
                 content = ""
