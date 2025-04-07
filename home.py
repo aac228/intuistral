@@ -1,5 +1,7 @@
 from typing import Generator
 
+from mistralai_private import TextChunk, ToolReferenceChunk
+
 from textual import work, on
 from textual.screen import Screen
 from textual.app import (
@@ -15,7 +17,6 @@ from textual.containers import (
 from textual.widgets import (
     RadioButton,
     RadioSet,
-    Label,
     Header,
     Footer,
     Input,
@@ -97,6 +98,8 @@ class LeChatScreen(Screen):
 
     AUTO_FOCUS = "Input"
 
+    BINDINGS = [("ctrl+l", "chat_list", "Show list of chats")]
+
     CSS = """
     UserMessage {
         background: black 0%;
@@ -144,7 +147,18 @@ class LeChatScreen(Screen):
                 print(f"{messages=}")
                 for message in messages:
                     if message.role == "assistant":
-                        yield AssistantMessage(message.content)
+                        if isinstance(message.content, str):
+                            yield AssistantMessage(message.content)
+                        if isinstance(message.content, list):
+                            content = ""
+                            for c in message.content:
+                                if isinstance(c, str):
+                                    content += c
+                                elif isinstance(c, TextChunk):
+                                    content += c.text
+                                elif isinstance(c, ToolReferenceChunk):
+                                    content += f" [[{c.title}]({c.url})] "
+                            yield AssistantMessage(content)
                     if message.role == "user":
                         yield UserMessage(message.content)
         yield Prompt(placeholder="Ask le chat")
@@ -184,10 +198,13 @@ class LeChatScreen(Screen):
                 messages = None
                 content = ""
 
+    def action_chat_list(self):
+        self.app.switch_screen(LoadConversationScreen())
 
 class LeChatApp(App):
+
     def on_mount(self) -> None:
-        self.push_screen(LoadConversationScreen())
+        self.push_screen(LeChatScreen())
 
 if __name__ == "__main__":
     LeChatApp().run()

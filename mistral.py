@@ -45,7 +45,6 @@ def parse_conversation_event(
 ) -> ConversationStartResponse:
     outputs = ""
     image = None
-    ref_count = 0
     if isinstance(event.data, ResponseStartedEvent):
         conversation_id = event.data.conversation_id
     if isinstance(event.data, MessageOutputEvent):
@@ -53,7 +52,6 @@ def parse_conversation_event(
             outputs = event.data.content
         elif isinstance(event.data.content, ToolReferenceChunk):
             outputs += f" [[{event.data.content.title}]({event.data.content.url})] "
-            ref_count += 1
         elif isinstance(event.data.content, ToolReferenceChunk):
             outputs += f" [[{event.data.content.title}]({event.data.content.url})] "
             ref_count += 1
@@ -88,7 +86,7 @@ def start_conversation(
     resp = client.beta.conversations.start_stream(
         model=DEFAULT_MODEL,
         inputs=inputs,
-        name=conv_title.parsed.title,
+        name=conv_title.choices[0].message.parsed.title,
         tools=[{"type": "web_search"}, {"type": "generate_image"}]
     )
     conversation_id = ""
