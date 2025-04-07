@@ -1,3 +1,5 @@
+from typing import Generator
+
 from textual import work, on
 from textual.screen import Screen
 from textual.app import (
@@ -25,7 +27,7 @@ from rich_pixels import Pixels, HalfcellRenderer
 from mistral import (
     start_conversation,
     append_conversation,
-    list_conversations
+    list_conversations, ConversationStartResponse, get_messages
 )
 
 
@@ -50,17 +52,28 @@ class Logo(Static):
 
 class Img(Static):
 
+    CSS = """
+    #gen-image {
+        height: 50%;
+        width: 100%;
+        position: relative;
+        align: center middle;
+        text-align: center;
+    }
+    """
+
     def __init__(self, image: Image, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, id="gen-image")
         self.image = image
 
     def render(self) -> RenderResult:
         pixels = Pixels.from_image(
             self.image,
-            resize=(45, 37),
+            resize=(65, 65),
             renderer=HalfcellRenderer()
         )
         return pixels
+
 
 class LoadConversationScreen(Screen):
     CSS_PATH = "load-convo.tcss"
@@ -70,18 +83,17 @@ class LoadConversationScreen(Screen):
             with Horizontal():
                 with RadioSet(id="focus_me"):
                     for conv in list_conversations():
-                        button = RadioButton(conv)
+                        button = RadioButton(label=conv.name, name=conv.id)
                         yield button
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        selected_conversation= event.pressed.label
-        self.app.switch_screen(LeChatScreen(selected_conversation))
+        selected_conversation = event.pressed.name
+        self.app.switch_screen(LeChatScreen(conversation_id=selected_conversation))
 
     def on_mount(self) -> None:
         self.query_one(RadioSet).focus()
 
 class LeChatScreen(Screen):
-    conversation_id: str | None = None
 
     AUTO_FOCUS = "Input"
 
@@ -115,6 +127,9 @@ class LeChatScreen(Screen):
         align: center middle;
     }
     """
+    def __init__(self, *args, conversation_id: str | None = None, **kwargs) -> None:
+        self.conversation_id: str | None = conversation_id
+        super().__init__(*args, **kwargs)
 
     def compose(self):
         """Create child widgets for the app."""
@@ -123,6 +138,15 @@ class LeChatScreen(Screen):
         with VerticalScroll(id="messages"):
             with Container(id="logo-container"):
                 yield Logo(id="logo")
+            if self.conversation_id:
+                print(f"{self.conversation_id=}")
+                messages = get_messages(self.conversation_id)
+                print(f"{messages=}")
+                for message in messages:
+                    if message.role == "assistant":
+                        yield AssistantMessage(message.content)
+                    if message.role == "user":
+                        yield UserMessage(message.content)
         yield Prompt(placeholder="Ask le chat")
 
     @on(Input.Submitted)
@@ -131,31 +155,35 @@ class LeChatScreen(Screen):
         event.input.clear()
         await messages.remove_children("#logo")
         await messages.mount(UserMessage(event.value))
-        self.receive_result(event.value)
+        if self.conversation_id is None:
+            resp = start_conversation(inputs=event.value)
+        else:
+            resp = append_conversation(conversation_id=self.conversation_id, inputs=event.value)
+        self.display_response(resp)
 
-    @work()
-    async def receive_result(
+    @work(exclusive=True, thread=True)
+    async def display_response(
         self,
-        prompt: str
+        chunks: Generator[ConversationStartResponse, None, None]
     ) -> None:
         messages = self.query_one("#messages")
-        await messages.mount(message := AssistantMessage())
-        message.anchor()
+        message = None
         content = ""
-        if self.conversation_id is None:
-            resp = start_conversation(inputs=prompt)
-        else:
-            resp = append_conversation(conversation_id=self.conversation_id, inputs=prompt)
-        for chunk in resp:
+        for chunk in chunks:
             self.conversation_id = chunk["conversation_id"]
-            if chunk["image"]:
-                await messages.mount(Img(image_id=chunk["image"]))
-                await messages.mount(message := AssistantMessage())
-                message.anchor()
-                content = ""
-            if chunk["outputs"]:
+            if chunk["outputs"] and chunk["outputs"] != "":
                 content += chunk["outputs"]
-                await message.update(content)
+                if message is None:
+                    message = AssistantMessage()
+                    self.app.call_from_thread(messages.mount, message)
+                    message.anchor()
+                self.app.call_from_thread(message.update, content)
+            if chunk["image"]:
+                img = Img(image=chunk["image"])
+                self.app.call_from_thread(messages.mount, img)
+                messages = None
+                content = ""
+
 
 class LeChatApp(App):
     def on_mount(self) -> None:

@@ -6,6 +6,7 @@ import httpx
 from PIL import Image
 from mistralai_private import MistralPrivate, ToolReferenceChunk, ToolExecutionStartedEvent, ToolFileChunk
 from mistralai_private.models.conversationevents import ResponseStartedEvent, MessageOutputEvent, ConversationEvents
+from pydantic import BaseModel
 
 url = "https://api.mistral.ai/"
 api_key = os.environ.get("MISTRAL_API_KEY")
@@ -23,13 +24,20 @@ client = MistralPrivate(
     client=client
 )
 
-DEFAULT_MODEL = "mistral-large-2411"
+DEFAULT_MODEL = "pixtral-large-2411"
 
 class ConversationStartResponse(TypedDict):
     conversation_id: str
     outputs: str
     image: Image
 
+tool_call_map = {
+    "web_search": "Searching the web",
+    "generate_image": "Generating an image",
+}
+
+class ConvTitle(BaseModel):
+    title: str
 
 def parse_conversation_event(
     event: ConversationEvents,
@@ -55,7 +63,7 @@ def parse_conversation_event(
     if isinstance(event.data, ToolExecutionStartedEvent):
         if outputs:
             outputs += "\n"
-        outputs += "Searching the web\n\n"
+        outputs += f"{tool_call_map[event.data.name]}\n\n"
     return ConversationStartResponse(
         conversation_id=conversation_id,
         outputs=outputs,
@@ -66,7 +74,8 @@ def parse_conversation_event(
 def start_conversation(
     inputs: "str"
 ) -> Generator[ConversationStartResponse, None, None]:
-    name_resp = client.chat.complete(
+    conv_title = client.chat.parse(
+        response_format=ConvTitle,
         model=DEFAULT_MODEL,
         messages=[
             {
@@ -79,8 +88,8 @@ def start_conversation(
     resp = client.beta.conversations.start_stream(
         model=DEFAULT_MODEL,
         inputs=inputs,
-        name=name_resp.choices[0].message.content,
-        tools=[{"type": "web_search"}]
+        name=conv_title.parsed.title,
+        tools=[{"type": "web_search"}, {"type": "generate_image"}]
     )
     conversation_id = ""
     for event in resp:
@@ -108,8 +117,14 @@ def append_conversation(
         )
         yield resp
 
-def list_conversations() -> List[str]:
-    conv_ids: List[str] = []
-    for conv in client.beta.conversations.list():
-        conv_ids.append(conv.id)
-    return conv_ids
+def list_conversations():
+    return [
+        conv for conv in client.beta.conversations.list(page_size=100)
+        if conv.name
+    ]
+
+
+def get_messages(conversation_id: str):
+    return [
+        msg for msg in client.beta.conversations.get_messages(conversation_id=conversation_id).messages
+    ]
