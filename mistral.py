@@ -1,6 +1,6 @@
 import io
 import os
-from typing import TypedDict, AsyncGenerator, Generator, NotRequired
+from typing import TypedDict, AsyncGenerator, Generator, NotRequired, List
 
 import httpx
 from PIL import Image
@@ -107,3 +107,9 @@ def append_conversation(
             event=event
         )
         yield resp
+
+def list_conversations() -> List[str]:
+    conv_ids: List[str] = []
+    for conv in client.beta.conversations.list():
+        conv_ids.append(conv.id)
+    return conv_ids
