@@ -129,7 +129,7 @@ class LeChatScreen(Screen):
 
     AUTO_FOCUS = "Input"
 
-    BINDINGS = [("ctrl+l", "chat_list", "View previous chats"), ("ctrl+n", "new_chat", "Start a new chat")]
+    BINDINGS = [("ctrl+l", "chat_list", "View previous chats"), ("ctrl+n", "new_chat", "Start a new chat"), ("ctrl+t", "show_options", "Options")]
 
     CSS = """
     UserMessage {
@@ -273,10 +273,7 @@ class LeChatScreen(Screen):
 
 class OptionsScreen(Screen):
     CSS_PATH = "./switch.tcss"
-    BINDINGS = [("ctrl+o", "open_chat", "Open chat"),
-                ("ctrl+n", "new_chat", "New chat"),
-                ("ctrl+t", "show_options", "Options")]
-
+    BINDINGS = [("ctrl+l", "chat_list", "View previous chats"), ("ctrl+n", "new_chat", "Start a new chat"), ("ctrl+t", "show_options", "Options")]
     def compose(self) -> ComposeResult:
         yield Footer()
         yield Static("[b]Options\n", classes="label")
