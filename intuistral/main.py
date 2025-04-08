@@ -22,7 +22,8 @@ from textual.widgets import (
     Footer,
     Input,
     Static,
-    Markdown
+    Markdown,
+    Switch
 )
 from PIL import Image
 from rich_pixels import Pixels, HalfcellRenderer
@@ -35,6 +36,8 @@ import sys
 from pathlib import Path
 
 cwd = Path(__file__).parent
+
+
 
 
 class UserMessage(Markdown):
@@ -94,6 +97,7 @@ class LoadConversationScreen(Screen):
         self.current_conversation_id = current_conversation_id
 
     def compose(self) -> ComposeResult:
+        yield Footer()
         with VerticalScroll():
             with Horizontal():
                 with RadioSet(id="focus_me"):
@@ -104,6 +108,15 @@ class LoadConversationScreen(Screen):
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         selected_conversation = event.pressed.name
         self.app.switch_screen(LeChatScreen(conversation_id=selected_conversation))
+
+    def action_open_chat(self):
+        self.app.switch_screen(LoadConversationScreen())
+
+    def action_new_chat(self):
+        self.app.switch_screen(LeChatScreen())
+
+    def action_show_options(self):
+        self.app.switch_screen(OptionsScreen())
 
     def on_mount(self) -> None:
         self.query_one(RadioSet).focus()
@@ -252,6 +265,60 @@ class LeChatScreen(Screen):
 
     def action_new_chat(self):
         self.app.switch_screen(LeChatScreen())
+
+    def action_show_options(self):
+        self.app.switch_screen(OptionsScreen())
+
+
+
+class OptionsScreen(Screen):
+    CSS_PATH = "./switch.tcss"
+    BINDINGS = [("ctrl+o", "open_chat", "Open chat"),
+                ("ctrl+n", "new_chat", "New chat"),
+                ("ctrl+t", "show_options", "Options")]
+
+    def compose(self) -> ComposeResult:
+        yield Footer()
+        yield Static("[b]Options\n", classes="label")
+        yield Horizontal(
+            Static("Web search:            ", classes="label"),
+            Switch(value=False),
+            classes="container",
+        )
+        yield Horizontal(
+            Static("Image generation:      ", classes="label"),
+            Switch(value=False),
+            classes="container",
+        )
+        yield Horizontal(
+            Static("Code interpreter:      ", classes="label"),
+            Switch(value=False),
+            classes="container",
+        )
+    def action_open_chat(self):
+        self.app.switch_screen(LoadConversationScreen())
+
+    def action_new_chat(self):
+        self.app.switch_screen(LeChatScreen())
+
+    def action_show_options(self):
+        self.app.switch_screen(OptionsScreen())
+
+class CreditsScreen(Screen):
+    BINDINGS = [("ctrl+o", "open_chat", "Open chat"),
+                ("ctrl+n", "new_chat", "New chat"),
+                ("ctrl+t", "show_options", "Options")]
+
+
+    def action_open_chat(self):
+        self.app.switch_screen(LoadConversationScreen())
+
+    def action_new_chat(self):
+        self.app.switch_screen(LeChatScreen())
+
+    def action_show_options(self):
+        self.app.switch_screen(OptionsScreen())
+
 
 class LeChatApp(App):
 
