@@ -24,7 +24,7 @@ client = MistralPrivate(
     client=client
 )
 
-DEFAULT_MODEL = "pixtral-large-2411"
+DEFAULT_MODEL = "mistral-large-2411"
 
 class ConversationStartResponse(TypedDict):
     conversation_id: str

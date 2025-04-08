@@ -139,11 +139,10 @@ class LeChatScreen(Screen):
     Prompt {
         border: round orange 50%;
     }
+
     #logo-container {
         position: relative;
-        align: center middle;
         text-align: center;
-        align: center middle;
     }
     
     #gen-image {
