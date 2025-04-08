@@ -33,6 +33,7 @@ class ConversationStartResponse(TypedDict):
 
 tool_call_map = {
     "web_search": "Searching the web",
+    "news_search": "Searching the web",
     "generate_image": "Generating an image",
 }
 
