@@ -3,6 +3,7 @@ from typing import Generator
 from mistralai_private import TextChunk, ToolReferenceChunk
 
 from textual import work, on
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.app import (
     App,
@@ -74,6 +75,20 @@ class LoadConversationScreen(Screen):
     BORDER_TITLE = "Select conversation"
     BINDINGS = [("escape", "go_back", "Go back to chat")]
 
+    CSS = """
+    Screen {
+        align: center middle;
+    }
+    
+    RadioSet {
+        border: round orange 50%;
+        background: black 0%;
+    }
+    RadioButton {
+    
+    }
+    """
+
     def __init__(self, *args, current_conversation_id: str | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.current_conversation_id = current_conversation_id
@@ -125,8 +140,6 @@ class LeChatScreen(Screen):
         border: round orange 50%;
     }
     #logo-container {
-        height: 50%;
-        width: 100%;
         position: relative;
         align: center middle;
         text-align: center;
@@ -134,7 +147,7 @@ class LeChatScreen(Screen):
     }
     
     #gen-image {
-        margin-left: 80;
+        margin-left: 75;
         position: relative;
         align: center middle;
         text-align: center;
@@ -158,35 +171,49 @@ class LeChatScreen(Screen):
         with VerticalScroll(id="messages"):
             with Container(id="logo-container"):
                 yield Logo(id="logo")
-            if self.conversation_id:
-                print(f"{self.conversation_id=}")
-                messages = get_messages(self.conversation_id)
-                print(f"{messages=}")
-                for message in messages:
-                    if message.role == "assistant":
-                        if isinstance(message.content, str):
-                            yield AssistantMessage(message.content)
-                        if isinstance(message.content, list):
-                            content = ""
-                            for c in message.content:
-                                if isinstance(c, str):
-                                    content += c
-                                elif isinstance(c, TextChunk):
-                                    content += c.text
-                                elif isinstance(c, ToolReferenceChunk):
-                                    content += f" [[{c.title}]({c.url})] "
-                            yield AssistantMessage(content)
-                    if message.role == "user":
-                        yield UserMessage(message.content)
         yield Prompt(placeholder="Ask le chat")
 
     async def on_mount(self):
+        remove_logo = False
+        messages = self.query_one("#messages")
+
+        if self.conversation_id:
+            remove_logo = True
+            history = get_messages(self.conversation_id)
+            for message in history:
+                if message.role == "assistant":
+                    if isinstance(message.content, str):
+                        await messages.mount(AssistantMessage(message.content))
+                    if isinstance(message.content, list):
+                        content = ""
+                        for c in message.content:
+                            if isinstance(c, str):
+                                content += c
+                            elif isinstance(c, TextChunk):
+                                content += c.text
+                            elif isinstance(c, ToolReferenceChunk):
+                                content += f" [[{c.title}]({c.url})] "
+                        await  messages.mount(AssistantMessage(content))
+                if message.role == "user":
+                    await messages.mount(UserMessage(message.content))
+
         if self.initial_message:
+            remove_logo = True
             await self.add_assistant_response(self.initial_message)
+
+        if remove_logo:
+            logo = self.query_one("#logo")
+            await logo.remove()
+
 
     @on(Input.Submitted)
     async def on_input(self, event: Input.Submitted) -> None:
         event.input.clear()
+        try:
+            logo = self.query_one("#logo")
+            await logo.remove()
+        except NoMatches:
+            pass
         await self.add_assistant_response(event.value)
 
     async def add_assistant_response(self, prompt: str):
