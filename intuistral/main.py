@@ -25,11 +25,15 @@ from textual.widgets import (
 )
 from PIL import Image
 from rich_pixels import Pixels, HalfcellRenderer
-from mistral import (
+from intuistral.mistral import (
     start_conversation,
     append_conversation,
     list_conversations, ConversationStartResponse, get_messages
 )
+import sys
+from pathlib import Path
+
+cwd = Path(__file__).parent
 
 
 class UserMessage(Markdown):
@@ -45,7 +49,7 @@ class Logo(Static):
 
     def render(self) -> RenderResult:
         pixels = Pixels.from_image_path(
-            "./resources/logo.png",
+            cwd / "resources/logo.png",
             resize=(45, 37),
             renderer=HalfcellRenderer()
         )
@@ -67,8 +71,13 @@ class Img(Static):
 
 
 class LoadConversationScreen(Screen):
-    CSS_PATH = "load-convo.tcss"
     BORDER_TITLE = "Select conversation"
+    BINDINGS = [("escape", "go_back", "Go back to chat")]
+
+    def __init__(self, *args, current_conversation_id: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.current_conversation_id = current_conversation_id
+
     def compose(self) -> ComposeResult:
         with VerticalScroll():
             with Horizontal():
@@ -84,11 +93,15 @@ class LoadConversationScreen(Screen):
     def on_mount(self) -> None:
         self.query_one(RadioSet).focus()
 
+    def action_go_back(self):
+        self.app.switch_screen(LeChatScreen(conversation_id=self.current_conversation_id))
+
+
 class LeChatScreen(Screen):
 
     AUTO_FOCUS = "Input"
 
-    BINDINGS = [("ctrl+l", "chat_list", "Show list of chats")]
+    BINDINGS = [("ctrl+l", "chat_list", "View previous chats"), ("ctrl+n", "new_chat", "Start a new chat")]
 
     CSS = """
     UserMessage {
@@ -127,8 +140,15 @@ class LeChatScreen(Screen):
         text-align: center;
     }
     """
-    def __init__(self, *args, conversation_id: str | None = None, **kwargs) -> None:
-        self.conversation_id: str | None = conversation_id
+    def __init__(
+        self,
+        *args,
+        conversation_id: str | None = None,
+        initial_message: str | None = None,
+        **kwargs
+    ) -> None:
+        self.conversation_id = conversation_id
+        self.initial_message = initial_message
         super().__init__(*args, **kwargs)
 
     def compose(self):
@@ -160,16 +180,22 @@ class LeChatScreen(Screen):
                         yield UserMessage(message.content)
         yield Prompt(placeholder="Ask le chat")
 
+    async def on_mount(self):
+        if self.initial_message:
+            await self.add_assistant_response(self.initial_message)
+
     @on(Input.Submitted)
     async def on_input(self, event: Input.Submitted) -> None:
-        messages = self.query_one("#messages")
         event.input.clear()
-        await messages.remove_children("#logo")
-        await messages.mount(UserMessage(event.value))
+        await self.add_assistant_response(event.value)
+
+    async def add_assistant_response(self, prompt: str):
+        messages = self.query_one("#messages")
+        await messages.mount(UserMessage(prompt))
         if self.conversation_id is None:
-            resp = start_conversation(inputs=event.value)
+            resp = start_conversation(inputs=prompt)
         else:
-            resp = append_conversation(conversation_id=self.conversation_id, inputs=event.value)
+            resp = append_conversation(conversation_id=self.conversation_id, inputs=prompt)
         self.display_response(resp)
 
     @work(exclusive=True, thread=True)
@@ -196,12 +222,26 @@ class LeChatScreen(Screen):
                 content = ""
 
     def action_chat_list(self):
-        self.app.switch_screen(LoadConversationScreen())
+        self.app.switch_screen(LoadConversationScreen(current_conversation_id=self.conversation_id))
+
+    def action_new_chat(self):
+        self.app.switch_screen(LeChatScreen())
 
 class LeChatApp(App):
 
+    def __init__(self, message: str | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.message = message
+
     def on_mount(self) -> None:
-        self.push_screen(LeChatScreen())
+        self.push_screen(LeChatScreen(initial_message=self.message))
+
+def tui():
+    args = sys.argv
+    if len(args) == 2:
+        LeChatApp(args[1]).run()
+    else:
+        LeChatApp().run()
 
 if __name__ == "__main__":
-    LeChatApp().run()
+    tui()

@@ -52,9 +52,6 @@ def parse_conversation_event(
             outputs = event.data.content
         elif isinstance(event.data.content, ToolReferenceChunk):
             outputs += f" [[{event.data.content.title}]({event.data.content.url})] "
-        elif isinstance(event.data.content, ToolReferenceChunk):
-            outputs += f" [[{event.data.content.title}]({event.data.content.url})] "
-            ref_count += 1
         elif isinstance(event.data.content, ToolFileChunk):
             file_bytes = client.files.download(file_id=event.data.content.file_id).read()
             image = Image.open(io.BytesIO(file_bytes))
@@ -72,21 +69,21 @@ def parse_conversation_event(
 def start_conversation(
     inputs: "str"
 ) -> Generator[ConversationStartResponse, None, None]:
-    conv_title = client.chat.parse(
-        response_format=ConvTitle,
-        model=DEFAULT_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": f"Create a title for the conversation with the first message being: \n\n{inputs}"
-            }
-        ],
-        temperature=0,
-    )
+    # conv_title = client.chat.parse(
+    #     response_format=ConvTitle,
+    #     model=DEFAULT_MODEL,
+    #     messages=[
+    #         {
+    #             "role": "user",
+    #             "content": f"Create a title for the conversation with the first message being: \n\n{inputs}"
+    #         }
+    #     ],
+    #     temperature=0,
+    # )
     resp = client.beta.conversations.start_stream(
         model=DEFAULT_MODEL,
         inputs=inputs,
-        name=conv_title.choices[0].message.parsed.title,
+        name=inputs[:30] + "...",
         tools=[{"type": "web_search"}, {"type": "generate_image"}]
     )
     conversation_id = ""
